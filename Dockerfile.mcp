@@ -1,10 +1,24 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir fastapi uvicorn pydantic
+# Install UV package manager
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies using UV (will use Python 3.12)
+RUN uv sync --frozen --no-dev
 
 COPY mcp_server/ ./mcp_server/
 
-CMD ["python", "-m", "mcp_server.server"]
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Expose port
+EXPOSE 8001
+
+# Run MCP server
+CMD ["uv", "run", "python", "-m", "mcp_server.server"]
