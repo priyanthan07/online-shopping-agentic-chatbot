@@ -1,0 +1,32 @@
+[
+    {
+        "question": "What is your return policy?",
+        "answer": "We offer a 30-day return policy for all products. Items must be in original condition with receipt. Perishable items can be returned within 7 days if unsatisfactory.",
+        "category": "returns"
+    },
+    {
+        "question": "Do you deliver on weekends?",
+        "answer": "Yes, we deliver 7 days a week. Weekend delivery slots are available from 9 AM to 6 PM.",
+        "category": "delivery"
+    },
+    {
+        "question": "What are your delivery hours?",
+        "answer": "We deliver Monday-Friday from 8 AM to 8 PM, and weekends from 9 AM to 6 PM.",
+        "category": "delivery"
+    },
+    {
+        "question": "How do I track my order?",
+        "answer": "You can track your order using the tracking link sent to your email, or by logging into your account and viewing order history.",
+        "category": "orders"
+    },
+    {
+        "question": "What payment methods do you accept?",
+        "answer": "We accept all major credit cards (Visa, MasterCard, American Express), debit cards, and PayPal.",
+        "category": "payment"
+    },
+    {
+        "question": "Is there a minimum order amount?",
+        "answer": "Yes, the minimum order amount is $25 for delivery. There is no minimum for in-store pickup.",
+        "category": "orders"
+    }
+]

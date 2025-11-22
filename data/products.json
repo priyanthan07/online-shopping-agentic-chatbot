@@ -1,0 +1,66 @@
+[
+    {
+        "id": "P001",
+        "name": "Organic Milk",
+        "category": "Dairy",
+        "price": 4.99,
+        "description": "Fresh organic whole milk, 1 gallon",
+        "in_stock": true
+    },
+    {
+        "id": "P002",
+        "name": "Whole Wheat Bread",
+        "category": "Bakery",
+        "price": 3.49,
+        "description": "Freshly baked whole wheat bread",
+        "in_stock": true
+    },
+    {
+        "id": "P003",
+        "name": "Free Range Eggs",
+        "category": "Dairy",
+        "price": 5.99,
+        "description": "Dozen free-range eggs",
+        "in_stock": true
+    },
+    {
+        "id": "P004",
+        "name": "Bananas",
+        "category": "Produce",
+        "price": 0.59,
+        "description": "Fresh bananas, per lb",
+        "in_stock": true
+    },
+    {
+        "id": "P005",
+        "name": "Chicken Breast",
+        "category": "Meat",
+        "price": 8.99,
+        "description": "Boneless skinless chicken breast, per lb",
+        "in_stock": true
+    },
+    {
+        "id": "P006",
+        "name": "Apples",
+        "category": "Produce",
+        "price": 1.99,
+        "description": "Fresh Gala apples, per lb",
+        "in_stock": true
+    },
+    {
+        "id": "P007",
+        "name": "Pasta",
+        "category": "Pantry",
+        "price": 2.49,
+        "description": "Italian pasta, 1 lb package",
+        "in_stock": false
+    },
+    {
+        "id": "P008",
+        "name": "Rice",
+        "category": "Pantry",
+        "price": 12.99,
+        "description": "Basmati rice, 10 lb bag",
+        "in_stock": true
+    }
+]

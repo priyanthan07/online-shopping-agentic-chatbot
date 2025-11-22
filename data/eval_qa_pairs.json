@@ -1,0 +1,44 @@
+[
+    {
+        "question": "What is your return policy?",
+        "expected_keywords": [
+            "30 days",
+            "return",
+            "original condition",
+            "receipt"
+        ]
+    },
+    {
+        "question": "How much does milk cost?",
+        "expected_keywords": [
+            "milk",
+            "4.99",
+            "price"
+        ]
+    },
+    {
+        "question": "Add apples to my cart",
+        "expected_keywords": [
+            "added",
+            "apple",
+            "cart"
+        ]
+    },
+    {
+        "question": "Can I buy milk and bread for $10?",
+        "expected_keywords": [
+            "budget",
+            "8.48",
+            "within"
+        ]
+    },
+    {
+        "question": "Do you deliver on weekends?",
+        "expected_keywords": [
+            "weekend",
+            "saturday",
+            "sunday",
+            "7 days"
+        ]
+    }
+]

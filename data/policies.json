@@ -1,0 +1,22 @@
+[
+    {
+        "title": "Refund Policy",
+        "type": "refund",
+        "content": "Full refunds are issued for returns within 30 days. Refunds are processed within 5-7 business days to the original payment method. Perishable items must be returned within 7 days."
+    },
+    {
+        "title": "Delivery Policy",
+        "type": "delivery",
+        "content": "Free delivery on orders over $50. Standard delivery fee is $5.99. Delivery times are estimated and may vary based on traffic and weather conditions. We deliver to all zip codes within 25 miles of our stores."
+    },
+    {
+        "title": "Privacy Policy",
+        "type": "privacy",
+        "content": "We protect your personal information and never share it with third parties without consent. We use cookies to improve your shopping experience. You can opt out of marketing emails at any time."
+    },
+    {
+        "title": "Substitution Policy",
+        "type": "substitution",
+        "content": "If an item is out of stock, we may substitute with a similar item of equal or greater value. You will be notified of substitutions and can reject them at delivery."
+    }
+]
