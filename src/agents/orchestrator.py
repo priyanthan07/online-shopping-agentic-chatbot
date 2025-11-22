@@ -1,17 +1,17 @@
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from src.agents.faq_agent import FAQAgent
 from src.agents.action_agent import ActionAgent
 from src.guardrails.safety import SafetyGuardrails
 from src.monitoring.logger import ConversationLogger
-from src.config import MODEL_NAME
-from langfuse.callback import CallbackHandler
+from src.config import MODEL_NAME, OPENAI_API_KEY
+from langfuse.langchain import CallbackHandler
 from typing import Dict
 import json
 
 class OrchestratorAgent:
     def __init__(self, langfuse_handler: CallbackHandler):
-        self.llm = ChatOpenAI(model=MODEL_NAME, temperature=0)
+        self.llm = ChatOpenAI(model=MODEL_NAME, temperature=0, api_key=OPENAI_API_KEY)
         self.faq_agent = FAQAgent(langfuse_handler)
         self.action_agent = ActionAgent(langfuse_handler)
         self.guardrails = SafetyGuardrails()

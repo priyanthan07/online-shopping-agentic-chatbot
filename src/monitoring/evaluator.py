@@ -1,13 +1,13 @@
 import json
 from typing import List, Dict
 from langchain_openai import ChatOpenAI
-from src.config import MODEL_NAME, DATA_DIR
+from src.config import MODEL_NAME, DATA_DIR, OPENAI_API_KEY
 from src.monitoring.logger import ConversationLogger
 import time
 
 class AutoEvaluator:
     def __init__(self):
-        self.llm = ChatOpenAI(model=MODEL_NAME, temperature=0)
+        self.llm = ChatOpenAI(model=MODEL_NAME, temperature=0, api_key=OPENAI_API_KEY)
         self.logger = ConversationLogger()
         self.ground_truth = self.load_ground_truth()
         
