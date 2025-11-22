@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # Langfuse for tracing
+  langfuse-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes:
+      - langfuse-db-data:/var/lib/postgresql/data
+    networks:
+      - grocery-net
+
+  langfuse:
+    image: langfuse/langfuse:latest
+    depends_on:
+      - langfuse-db
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: mysecret
+      SALT: mysalt
+      NEXTAUTH_URL: http://localhost:3000
+    networks:
+      - grocery-net
+
+  # MCP Server
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    ports:
+      - "8001:8001"
+    networks:
+      - grocery-net
+
+  # Main Chatbot Application
+  chatbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - langfuse
+      - mcp-server
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-public-key}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-secret-key}
+      LANGFUSE_HOST: http://langfuse:3000
+      MCP_SERVER_URL: http://mcp-server:8001
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - chroma-data:/app/chroma_db
+    stdin_open: true
+    tty: true
+    networks:
+      - grocery-net
+
+volumes:
+  langfuse-db-data:
+  chroma-data:
+
+networks:
+  grocery-net:
+    driver: bridge
