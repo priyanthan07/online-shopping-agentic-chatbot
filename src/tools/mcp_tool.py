@@ -6,22 +6,25 @@ from langchain.tools import tool
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 from src.config import MCP_SERVER_URL
+from src.monitoring.logger import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 class MCPClient:
     def __init__(self):
         self.server_url = MCP_SERVER_URL
         self.available_tools: List[Dict[str, Any]] = []
         self.tools_discovered = False
+        logger.info(f"MCP Client created for {self.server_url}")
     
     async def _initialize_client(self):
         """Initialize connection and discover available tools"""
         if self.tools_discovered:
+            logger.debug("MCP tools already discovered, skipping")
             return
         
         try:
-            logger.info(f"Initialize MCP Client and URL: {self.server_url}")
+            logger.info(f"Initializing MCP Client at {self.server_url}")
             
             # Discover tools
             async with streamablehttp_client(self.server_url) as (read, write, _):
@@ -38,7 +41,8 @@ class MCPClient:
                     } for tool in tools]
                     
                     self.tools_discovered = True
-                    logger.info(f"Discovered tools: {[tool.name for tool in tools]}")
+                    tool_names = [tool.name for tool in tools]
+                    logger.info(f"Discovered {len(tool_names)} MCP tools: {tool_names}")
                     
         except Exception as e:
             logger.error(f"Failed to discover tools: {e}")
@@ -46,6 +50,9 @@ class MCPClient:
     
     async def call_tool(self, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Call a tool on the MCP server"""
+        logger.info(f"Calling MCP tool: {tool_name}")
+        logger.debug(f"Parameters: {parameters}")
+        
         try:
             async with streamablehttp_client(self.server_url) as (read, write, _):
                 async with ClientSession(read, write) as session:
@@ -56,14 +63,16 @@ class MCPClient:
                         content_text = result.content[0].text if result.content else ""
                         try:
                             parsed_content = json.loads(content_text)
+                            logger.info(f"MCP tool {tool_name} executed successfully")
                             return parsed_content
                         except json.JSONDecodeError:
+                            logger.debug("MCP result is not JSON, returning as text")
                             return {"success": True, "result": content_text}
                     else:
                         return {"success": True, "result": str(result)}
         
         except Exception as e:
-            logger.error(f"Tool call failed: {e}")
+            logger.error(f"MCP tool call failed for {tool_name}: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
 
@@ -76,19 +85,17 @@ def create_mcp_client() -> MCPClient:
     global _mcp_client
     if _mcp_client is None:
         _mcp_client = MCPClient()
+        logger.debug("Created new MCP client instance")
     return _mcp_client
 
 
 @tool
 def get_stock_price(product_id: str) -> str:
-    """Get stock price and availability via MCP server (implements MCP requirement).
-    
-    Args:
-        product_id: Product ID to check stock and price for
-        
-    Returns:
-        Stock price and availability information
     """
+        Get stock price and availability via MCP server (implements MCP requirement).
+    """
+    logger.info(f"Tool called: get_stock_price for product {product_id}")
+    
     try:
         client = create_mcp_client()
         
@@ -99,12 +106,15 @@ def get_stock_price(product_id: str) -> str:
         
         if result.get("success"):
             in_stock = "in stock" if result.get('in_stock') else "out of stock"
+            logger.info(f"Stock info retrieved for {product_id}")
             return f"{result['name']}: ${result['price']} - {result['quantity']} units available ({in_stock}) at {result['warehouse']}"
         else:
+            error_msg = f"Error: {result.get('error', 'Unknown error')}"
+            logger.warning(f"MCP tool returned error: {error_msg}")
             return f"Error: {result.get('error', 'Unknown error')}"
             
     except Exception as e:
-        logger.error(f"MCP tool error: {e}")
+        logger.error(f"MCP tool error for {product_id}: {e}", exc_info=True)
         return f"MCP Error: {str(e)}"
 
 

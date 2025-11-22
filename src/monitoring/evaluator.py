@@ -2,21 +2,25 @@ import json
 from typing import List, Dict
 from langchain_openai import ChatOpenAI
 from src.config import MODEL_NAME, DATA_DIR, OPENAI_API_KEY
-from src.monitoring.logger import ConversationLogger
+from src.monitoring.logger import setup_logger
 import time
 
 class AutoEvaluator:
     def __init__(self):
         self.llm = ChatOpenAI(model=MODEL_NAME, temperature=0, api_key=OPENAI_API_KEY)
-        self.logger = ConversationLogger()
+        self.logger = setup_logger(__name__)
         self.ground_truth = self.load_ground_truth()
+        self.logger.info("AutoEvaluator initialized")
         
     def load_ground_truth(self) -> List[Dict]:
         """Load ground truth Q&A pairs for evaluation"""
         try:
             with open(DATA_DIR / "eval_qa_pairs.json", 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                self.logger.info(f"Loaded {len(data)} evaluation test cases")
+                return data
         except FileNotFoundError:
+            self.logger.warning("eval_qa_pairs.json not found, using default test cases")
             # Return default test cases
             return [
                 {
@@ -30,11 +34,14 @@ class AutoEvaluator:
             ]
     def evaluate_response(self, question: str, response: str, expected_keywords: List[str]) -> Dict:
         """Evaluate a single response"""
+        self.logger.debug(f"Evaluating response for: {question[:50]}...")
         
         # Calculate keyword match score
         response_lower = response.lower()
         matched_keywords = sum(1 for kw in expected_keywords if kw.lower() in response_lower)
         keyword_score = matched_keywords / len(expected_keywords) if expected_keywords else 0
+        
+        self.logger.debug(f"Keyword score: {keyword_score:.2f} ({matched_keywords}/{len(expected_keywords)} matched)")
         
         # Use LLM to evaluate relevance
         eval_prompt = f"""Evaluate if this response adequately answers the question.
@@ -54,7 +61,10 @@ class AutoEvaluator:
         try:
             llm_eval = self.llm.invoke(eval_prompt).content.strip()
             relevance_score = float(llm_eval)
+            self.logger.debug(f"LLM relevance score: {relevance_score:.2f}")
+            
         except:
+            self.logger.warning(f"Failed to parse LLM evaluation, using default 0.5: {e}")
             relevance_score = 0.5  # Default if parsing fails
         
         # Combined score
@@ -71,18 +81,19 @@ class AutoEvaluator:
     
     def run_evaluation(self, orchestrator) -> Dict:
         """Run full evaluation suite"""
+        self.logger.info("="*50)
+        self.logger.info("Starting Evaluation Suite")
+        self.logger.info("="*50)
+        
         results = []
         total_latency = 0
-        
-        print("\n" + "="*50)
-        print("Running Auto-Evaluation")
-        print("="*50 + "\n")
+
         
         for i, test_case in enumerate(self.ground_truth, 1):
             question = test_case['question']
             expected_keywords = test_case.get('expected_keywords', [])
-            
-            print(f"Test {i}/{len(self.ground_truth)}: {question}")
+
+            self.logger.info(f"Test {i}/{len(self.ground_truth)}: {question}")
             
             # Measure latency
             start_time = time.time()
@@ -102,8 +113,7 @@ class AutoEvaluator:
             results.append(eval_result)
             
             status = "✓ PASS" if eval_result['passed'] else "✗ FAIL"
-            print(f"  {status} - Score: {eval_result['final_score']:.2f} - Latency: {latency:.2f}s")
-            print()
+            self.logger.info(f"  {status} - Score: {eval_result['final_score']:.2f} - Latency: {latency:.2f}s")
         
         # Calculate aggregate metrics
         passed_tests = sum(1 for r in results if r['passed'])
@@ -120,20 +130,15 @@ class AutoEvaluator:
             "results": results
         }
         
-        # Log metrics
-        self.logger.update_metrics("evaluation_pass_rate", summary['pass_rate'])
-        self.logger.update_metrics("average_latency", avg_latency)
-        
-        print("="*50)
-        print("Evaluation Summary")
-        print("="*50)
-        print(f"Pass Rate: {summary['pass_rate']*100:.1f}% ({passed_tests}/{len(results)})")
-        print(f"Average Score: {avg_score:.2f}")
-        print(f"Average Latency: {avg_latency:.2f}s")
-        print("="*50 + "\n")
+        self.logger.info(f"Evaluation pass rate: {summary['pass_rate']:.2%}")
+        self.logger.info(f"Average latency: {avg_latency:.2f}s")
+    
         
         # Save detailed results
-        with open(DATA_DIR.parent / "logs" / "evaluation_results.json", 'w') as f:
+        results_file = DATA_DIR.parent / "logs" / "evaluation_results.json"
+        with open(results_file, 'w') as f:
             json.dump(summary, f, indent=2)
+            
+        self.logger.info(f"Evaluation results saved to {results_file}")
         
         return summary

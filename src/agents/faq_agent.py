@@ -1,8 +1,8 @@
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain.agents import AgentExecutor, create_openai_functions_agent
+from langchain.agents import create_agent
 from src.rag.retriever import RAGRetriever
 from src.config import MODEL_NAME, OPENAI_API_KEY
+from src.monitoring.logger import setup_logger
 from langfuse.langchain import CallbackHandler
 
 class FAQAgent:
@@ -10,51 +10,46 @@ class FAQAgent:
         self.llm = ChatOpenAI(model=MODEL_NAME, temperature=0,api_key=OPENAI_API_KEY)
         self.retriever = RAGRetriever()
         self.langfuse_handler = langfuse_handler
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a helpful FAQ assistant for an online grocery store.
-            
-                        Use the following context to answer questions accurately:
-
-                        {context}
+        self.logger = setup_logger(__name__)
+        self.prompt = """You are a helpful FAQ assistant for an online grocery store.
 
                         Guidelines:
                         - Answer based on the provided context
                         - If the answer isn't in the context, say you don't know
                         - Be concise and helpful
                         - Focus on FAQs, policies, and general information
-                        - Don't make assumptions about specific orders or products not in context"""),
-                                    ("human", "{input}"),
-                                    ("placeholder", "{agent_scratchpad}")
-                        ])
+                    """
+        self.agent = create_agent(
+            model=self.llm,
+            tools=[],
+            system_prompt=self.prompt
+        )
+        self.logger.info("FAQAgent initialized")
         
     def answer(self, question: str) -> str:
         """
             Answer FAQ questions using RAG
         """
-
-        context = self.retriever.get_context(question)
+        self.logger.info(f"FAQAgent answering question")
+        self.logger.debug(f"Question: {question}")
         
-        # Create agent
-        agent = create_openai_functions_agent(
-            llm=self.llm,
-            tools=[],
-            prompt=self.prompt
-        )
+        try:
+            context = self.retriever.get_context(question)
+            self.logger.debug(f"Retrieved context length: {len(context)} chars")
+            
+            full_question = f"Context: {context}\n\nQuestion: {question}"
+            
+            result = self.agent.invoke(
+                {"messages": [{"role": "user", "content": full_question}]},
+                config={"callbacks": [self.langfuse_handler]}
+            )
+            response = result["messages"][-1].content
+            self.logger.info("FAQAgent answered successfully")
+            self.logger.debug(f"Answer: {response[:100]}...")
+            
+            return response
         
-        agent_executor = AgentExecutor(
-            agent=agent,
-            tools=[],
-            verbose=True,
-            handle_parsing_errors=True
-        )
+        except Exception as e:
+            self.logger.error(f"FAQAgent error: {e}", exc_info=True)
+            raise
         
-        # Execute with Langfuse tracing
-        result = agent_executor.invoke(
-            {
-                "input": question,
-                "context": context
-            },
-            config={"callbacks": [self.langfuse_handler]}
-        )
-        
-        return result['output']

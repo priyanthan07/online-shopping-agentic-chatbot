@@ -1,5 +1,6 @@
 from typing import Dict, Tuple
 from src.config import MAX_REFUND_AMOUNT, RESTRICTED_TOPICS
+from src.monitoring.logger import setup_logger
 import json
 import re
 
@@ -7,6 +8,9 @@ class SafetyGuardrails:
     def __init__(self):
         self.max_refund = MAX_REFUND_AMOUNT
         self.restricted_topics = RESTRICTED_TOPICS
+        self.logger = setup_logger(__name__)
+        self.logger.info(f"Safety guardrails initialized with max refund: ${self.max_refund}")
+        
         
     def check_content(self, message: str) -> Tuple[bool, str]:
         """
@@ -16,6 +20,7 @@ class SafetyGuardrails:
         
         for topic in self.restricted_topics:
             if topic in message_lower:
+                self.logger.warning(f"Restricted topic detected: {topic}")
                 return False, f"Sorry, I cannot discuss topics related to {topic}. I'm here to help with grocery shopping."
             
         # Check for malicious patterns
@@ -28,6 +33,7 @@ class SafetyGuardrails:
         
         for pattern in malicious_patterns:
             if re.search(pattern, message_lower):
+                self.logger.warning(f"Malicious pattern detected: {pattern}")
                 return False, "Invalid input detected. Please rephrase your request."
         return True, ""
     
@@ -49,23 +55,16 @@ class SafetyGuardrails:
                     amount = float(amounts[0]) if amounts else 0
                 
                 if amount > self.max_refund:
+                    self.logger.warning(f"Refund amount ${amount} exceeds limit ${self.max_refund}")
                     return False, f"Refund amount ${amount} exceeds maximum allowed refund of ${self.max_refund}. Please contact customer service."
+                else:
+                    self.logger.info(f"Refund amount ${amount} validated")
             
             return True, ""
         
         except Exception as e:
+            self.logger.error(f"Refund validation error: {e}")
             return True, ""
-    
-    def validate_tool_call(self, tool_name: str, tool_input: str) -> Tuple[bool, str]:
-        """
-            Validate tool calls before execution
-        """
-        
-        if tool_name == "create_refund":
-            return self.validate_refund(tool_input)
-        
-        
-        return True, ""
     
     def sanitize_output(self, output: str) -> str:
         """
@@ -73,8 +72,12 @@ class SafetyGuardrails:
         """
         sanitized = output
         
-        # Remove email patterns (example)
-        sanitized = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL]', sanitized)
+        # Remove email patterns
+        email_count = len(re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', sanitized))
+        if email_count > 0:
+            
+            self.logger.info(f"Sanitized {email_count} email addresses from output")
+            sanitized = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL]', sanitized)
         
         return sanitized
     

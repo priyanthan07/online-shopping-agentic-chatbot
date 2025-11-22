@@ -3,7 +3,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from src.agents.faq_agent import FAQAgent
 from src.agents.action_agent import ActionAgent
 from src.guardrails.safety import SafetyGuardrails
-from src.monitoring.logger import ConversationLogger
+from src.monitoring.logger import setup_logger
 from src.config import MODEL_NAME, OPENAI_API_KEY
 from langfuse.langchain import CallbackHandler
 from typing import Dict
@@ -15,7 +15,7 @@ class OrchestratorAgent:
         self.faq_agent = FAQAgent(langfuse_handler)
         self.action_agent = ActionAgent(langfuse_handler)
         self.guardrails = SafetyGuardrails()
-        self.logger = ConversationLogger()
+        self.logger = setup_logger(__name__)
         self.langfuse_handler = langfuse_handler
         
         self.routing_prompt = ChatPromptTemplate.from_messages([
@@ -37,10 +37,14 @@ class OrchestratorAgent:
                         ("human", "{input}")
                     ])
         
+        self.logger.info("Orchestrator initialized successfully")
+        
     def route_request(self, user_input: str) -> str:
         """
             Determine which agent should handle the request
         """
+        self.logger.debug(f"Routing request: {user_input[:100]}...")
+        
         response = self.llm.invoke(
             self.routing_prompt.format_messages(input=user_input),
             config={"callbacks": [self.langfuse_handler]}
@@ -56,34 +60,39 @@ class OrchestratorAgent:
                     content = content[4:]
             
             result = json.loads(content)
+            self.logger.info(f"Routed to: {result['category']} - Reason: {result.get('reasoning', 'N/A')}")
             return result['category']
         except:
-            # Default to GENERAL if parsing fails
+            self.logger.warning(f"Routing failed, defaulting to GENERAL: {e}")
             return "GENERAL"
         
     def process(self, user_input: str, session_id: str = "default") -> Dict:
         """
             Main orchestration logic with guardrails and monitoring
         """
+        self.logger.info(f"[Session: {session_id}] Processing request")
+        self.logger.debug(f"[Session: {session_id}] User input: {user_input}")
         
         # Apply safety guardrails
         is_safe, safety_msg = self.guardrails.check_content(user_input)
         if not is_safe:
+            self.logger.warning(f"[Session: {session_id}] Content blocked by guardrails")
             result = {
                 "response": safety_msg,
                 "agent": "guardrails",
                 "blocked": True
             }
-            self.logger.log_conversation(session_id, user_input, result)
             return result
         
-        # Route to appropriate agent
-        category = self.route_request(user_input)
-        
-        agent_used = category.lower()
-        response = ""
-        
         try:
+            # Route to appropriate agent
+            category = self.route_request(user_input)
+            
+            agent_used = category.lower()
+            response = ""
+        
+            self.logger.info(f"[Session: {session_id}] Using {agent_used} agent")
+            
             if category == "FAQ":
                 response = self.faq_agent.answer(user_input)
             elif category == "ACTION":
@@ -104,16 +113,17 @@ class OrchestratorAgent:
                 "blocked": False
             }
             
+            self.logger.info(f"[Session: {session_id}] Response generated successfully by {agent_used}")
+            self.logger.debug(f"[Session: {session_id}] Response: {response[:100]}...")
+            
         except Exception as e:
+            self.logger.error(f"[Session: {session_id}] Error processing request: {e}", exc_info=True)
             result = {
                 "response": f"I apologize, but I encountered an error processing your request. Please try again or rephrase your question.",
                 "agent": agent_used,
                 "error": str(e),
                 "blocked": False
             }
-        
-        # Log conversation
-        self.logger.log_conversation(session_id, user_input, result)
         
         return result
     
