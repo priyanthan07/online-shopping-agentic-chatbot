@@ -1,9 +1,3 @@
-"""
-MCP Server for Grocery Stock Management
-Runs as a standalone service with FastMCP
-"""
-
-import asyncio
 from mcp.server.fastmcp import FastMCP
 import logging
 from datetime import datetime
@@ -29,9 +23,8 @@ STOCK_DB = {
 
 @mcp.tool()
 async def get_stock_price(product_id: str) -> dict:
-    """Get stock price and availability for a product.
-    
-    This implements the get_stock_price() tool requirement from the task.
+    """
+        Get stock price and availability for a product.
     """
     try:
         if product_id in STOCK_DB:

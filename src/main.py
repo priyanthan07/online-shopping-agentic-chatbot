@@ -10,8 +10,8 @@ from src.agents.orchestrator import OrchestratorAgent
 from src.rag.ingestion import initialize_vectorstore
 from src.monitoring.evaluator import AutoEvaluator
 from langfuse import Langfuse
-from langfuse.callback import CallbackHandler
-from src.config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
+from langfuse.langchain  import CallbackHandler
+from src.config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_BASE_URL
 import argparse
 
 
@@ -35,12 +35,12 @@ def initialize_system():
         langfuse = Langfuse(
             public_key=LANGFUSE_PUBLIC_KEY,
             secret_key=LANGFUSE_SECRET_KEY,
-            host=LANGFUSE_HOST
+            host=LANGFUSE_BASE_URL
         )
         langfuse_handler = CallbackHandler(
             public_key=LANGFUSE_PUBLIC_KEY,
             secret_key=LANGFUSE_SECRET_KEY,
-            host=LANGFUSE_HOST
+            host=LANGFUSE_BASE_URL
         )
         print("✓ Langfuse connected")
     except Exception as e:

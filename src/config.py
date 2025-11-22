@@ -20,10 +20,10 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 # Langfuse Configuration
 LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")
 LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
-LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "http://localhost:3000")
+LANGFUSE_BASE_URL = os.getenv("LANGFUSE_BASE_URL", "")
 
 # MCP Server Configuration
-MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8001")
+MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "")
 
 # Guardrails Configuration
 MAX_REFUND_AMOUNT = 1000.0

@@ -1,15 +1,15 @@
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain.agents import AgentExecutor, create_openai_functions_agent
 from src.tools.grocery_tools import grocery_tools
 from src.tools.mcp_tool import mcp_tools
 from src.rag.retriever import RAGRetriever
-from src.config import MODEL_NAME
-from langfuse.callback import CallbackHandler
+from src.config import MODEL_NAME, OPENAI_API_KEY
+from langfuse.langchain import CallbackHandler
 
 class ActionAgent:
     def __init__(self, langfuse_handler: CallbackHandler):
-        self.llm = ChatOpenAI(model=MODEL_NAME, temperature=0)
+        self.llm = ChatOpenAI(model=MODEL_NAME, temperature=0, api_key=OPENAI_API_KEY)
         self.retriever = RAGRetriever()
         self.langfuse_handler = langfuse_handler
         self.tools = grocery_tools + mcp_tools
