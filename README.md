@@ -231,7 +231,7 @@ The application runs two Docker services:
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
 | `OPENAI_API_KEY` | OpenAI API key | Yes | - |
-| `MODEL_NAME` | OpenAI model to use | No | `gpt-4o` |
+| `MODEL_NAME` | OpenAI model to use | Yes | `gpt-4o` |
 | `LANGFUSE_PUBLIC_KEY` | Langfuse public key | No | - |
 | `LANGFUSE_SECRET_KEY` | Langfuse secret key | No | - |
 | `LANGFUSE_BASE_URL` | Langfuse server URL | No | `https://cloud.langfuse.com` |
