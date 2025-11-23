@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import logging
 from typing import Dict, Any, List
 from langchain.tools import tool
@@ -20,7 +21,7 @@ class MCPClient:
     async def _initialize_client(self):
         """Initialize connection and discover available tools"""
         if self.tools_discovered:
-            logger.debug("MCP tools already discovered, skipping")
+            logger.info("MCP tools already discovered, skipping")
             return
         
         try:
@@ -51,7 +52,7 @@ class MCPClient:
     async def call_tool(self, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Call a tool on the MCP server"""
         logger.info(f"Calling MCP tool: {tool_name}")
-        logger.debug(f"Parameters: {parameters}")
+        logger.info(f"Parameters: {parameters}")
         
         try:
             async with streamablehttp_client(self.server_url) as (read, write, _):
@@ -66,7 +67,7 @@ class MCPClient:
                             logger.info(f"MCP tool {tool_name} executed successfully")
                             return parsed_content
                         except json.JSONDecodeError:
-                            logger.debug("MCP result is not JSON, returning as text")
+                            logger.info("MCP result is not JSON, returning as text")
                             return {"success": True, "result": content_text}
                     else:
                         return {"success": True, "result": str(result)}
@@ -85,7 +86,7 @@ def create_mcp_client() -> MCPClient:
     global _mcp_client
     if _mcp_client is None:
         _mcp_client = MCPClient()
-        logger.debug("Created new MCP client instance")
+        logger.info("Created new MCP client instance")
     return _mcp_client
 
 

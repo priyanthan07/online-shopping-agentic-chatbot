@@ -1,47 +1,49 @@
 from langchain.tools import tool
-from typing import Dict, Optional
+from langchain_openai import ChatOpenAI
+from typing import Dict, Optional, List
+from pydantic import BaseModel, Field
 import json
 from pathlib import Path
-from src.config import DATA_DIR
+from src.config import DATA_DIR, OPENAI_API_KEY, MODEL_NAME
 from src.monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-# Mock database
-ORDERS_DB = {
-    "ORD001": {"total": 45.99, "status": "delivered", "items": ["milk", "bread"]},
-    "ORD002": {"total": 89.50, "status": "shipped", "items": ["apples", "chicken"]},
-    "ORD003": {"total": 120.00, "status": "processing", "items": ["rice", "pasta"]}
-}
-
-CART = {}
-
-@tool
-def get_item_price(item_name: str) -> str:
-    """
-        Get the current price of a grocery item by name.
-    """
-    logger.info(f"Tool called: get_item_price for '{item_name}'")
+class NormalizedItem(BaseModel):
+    original_text: str
+    normalized_name: str
+    quantity: int
+    reasoning: str
     
+class ItemNormalizationList(BaseModel):
+    items: List[NormalizedItem]
+
+# Load orders from JSON file
+def load_orders_db() -> Dict:
+    """Load orders database from JSON file"""
     try:
-        with open(DATA_DIR/"products.json", 'r' ) as f:
-            products = json.load(f)
-            
-        item_name_lower = item_name.lower()
-        for product in products:
-            if item_name_lower is product['name'].lower():
-                if product['in_stock']:
-                    logger.info(f"Price found: {product['name']} = ${product['price']} (in stock)")
-                    return f"{product['name']} costs ${product['price']}. It is currently in stock."
-                else:
-                    logger.warning(f"Product {product['name']} is out of stock")
-                    return f"{product['name']} costs ${product['price']} but is currently out of stock."
-        logger.warning(f"Item '{item_name}' not found in inventory")
-        return f"Item '{item_name}' not found in our inventory."
+        orders_file = DATA_DIR / "orders.json"
+        with open(orders_file, 'r') as f:
+            orders_list = json.load(f)
+        
+        # Convert list to dict with order_id as key
+        orders_db = {order["order_id"]: order for order in orders_list}
+        logger.info(f"Loaded {len(orders_db)} orders from {orders_file}")
+        return orders_db
+    
+    except FileNotFoundError:
+        logger.warning("orders.json not found, using empty database")
+        return {}
     
     except Exception as e:
-        logger.error(f"Error retrieving price for '{item_name}': {e}", exc_info=True)
-        return f"Error retrieving price: {str(e)}"
+        logger.error(f"Error loading orders.json: {e}")
+        return {}
+
+# Load orders database
+ORDERS_DB = load_orders_db()
+
+normalization_llm = ChatOpenAI(model=MODEL_NAME, temperature=0, api_key=OPENAI_API_KEY)
+structured_llm = normalization_llm.with_structured_output(ItemNormalizationList)
     
 @tool
 def create_refund(order_id: str, reason: str = "Customer request") -> str:
@@ -49,150 +51,207 @@ def create_refund(order_id: str, reason: str = "Customer request") -> str:
         Create a refund for an order.
     """
     logger.info(f"Tool called: create_refund for order '{order_id}'")
-    logger.debug(f"Refund reason: {reason}")
-    
     try:
         if order_id not in ORDERS_DB:
             logger.warning(f"Order {order_id} not found")
-            return f"Error: Order {order_id} not found."
+            return json.dumps({
+                "success": False,
+                "error": f"Order {order_id} not found in system."
+            })
         
         order = ORDERS_DB[order_id]
         amount = order['total']
         
         logger.info(f"Creating refund for {order_id}: ${amount}")
         
-        refund_data = {
-            "order_id": order_id,
-            "amount": amount,
-            "reason": reason,
-            "status": "pending"
-        }
-        
+        # Return refund information
         return json.dumps({
             "success": True,
             "refund_id": f"REF{order_id}",
+            "order_id": order_id,
             "amount": amount,
+            "reason": reason,
+            "status": "pending",
             "message": f"Refund of ${amount} initiated for order {order_id}. You will receive it in 5-7 business days."
         })
         
     except Exception as e:
         logger.error(f"Error creating refund for {order_id}: {e}", exc_info=True)
-        return f"Error in create refund: {str(e)}"
+        return json.dumps({
+            "success": False,
+            "error": f"Error processing refund: {str(e)}"
+        })
+        
+def normalize_items_with_llm(items_str: str, products) -> List[NormalizedItem]:
+    """
+        Use LLM to normalize item names and extract quantities
+    """
+    try:
+        
+        product_names = [p['name'] for p in products]
+        
+        prompt = f"""You are a product name normalizer for a grocery store.
+
+                    Available products in our store:
+                    {', '.join(product_names)}
+
+                    User's shopping list: "{items_str}"
+
+                    For each item in the user's list:
+                    1. Identify the most likely matching product from our available products
+                    2. Extract any quantity mentioned (e.g., "two eggs"-> quantity: 2, "eggs"-> quantity: 1)
+                    3. Normalize the item name to match our product catalog
+                    4. Provide reasoning
+
+                    Examples:
+                    - "two eggs"-> normalized_name: "eggs", quantity: 2
+                    - "chicken"-> normalized_name: "chicken", quantity: 1
+                    - "a dozen eggs"-> normalized_name: "eggs", quantity: 1 (we sell by dozen)
+                    - "milk"-> normalized_name: "milk", quantity: 1
+                    - "3 apples"-> normalized_name: "apples", quantity: 3
+
+                    Parse the items and provide normalized versions.
+                """
+        
+        result = structured_llm.invoke(prompt)
+        logger.info(f"LLM normalized {len(result.items)} items")
+        
+        for item in result.items:
+            logger.info(
+                f"  '{item.original_text}'-> '{item.normalized_name}' "
+                f"(qty: {item.quantity}) -> {item.reasoning}"
+            )
+        
+        return result.items
+        
+    except Exception as e:
+        logger.error(f"Error in LLM normalization: {e}", exc_info=True)
+        # Fallback: simple split
+        items_list = [item.strip() for item in items_str.split(',')]
+        return [
+            NormalizedItem(
+                original_text=item,
+                normalized_name=item,
+                quantity=1,
+                reasoning="Fallback normalization"
+            ) for item in items_list
+        ]
         
 @tool
 def calculate_budget(items: str, budget: float) -> str:
     """
-        Calculate if items fit within budget and suggest alternatives if needed.
+        Calculate if items fit within budget with intelligent item matching.
     """
     logger.info(f"Tool called: calculate_budget with budget=${budget}")
-    logger.debug(f"Items requested: {items}")
 
     try:
+        # Load products from products.json
         with open(DATA_DIR / "products.json", 'r') as f:
             products = json.load(f)
-            
-        item_list = [item.strip().lower() for item in items.split(',')]
+        
+        # Use LLM to normalize items
+        normalized_items = normalize_items_with_llm(items, products)
+        
         total_cost = 0
         found_items = []
+        not_found = []
         
-        for item_name in item_list:
+        # Process each normalized item
+        for norm_item in normalized_items:
+            item_name = norm_item.normalized_name.lower()
+            quantity = norm_item.quantity
+            found = False
+            
+            logger.info(f"Processing: '{norm_item.original_text}'-> '{item_name}' (qty: {quantity})")
+            
+            # Try to match with products
             for product in products:
-                if item_name in product['name'].lower():
+                product_name_lower = product['name'].lower()
+                
+                # Check if normalized name appears in product name
+                if item_name in product_name_lower or product_name_lower in item_name:
                     if product['in_stock']:
-                        total_cost += product['price']
+                        item_cost = product['price'] * quantity
+                        total_cost += item_cost
                         found_items.append({
-                            "name": product['name'],
-                            "price": product['price']
+                            "original": norm_item.original_text,
+                            "matched": product['name'],
+                            "price": product['price'],
+                            "quantity": quantity,
+                            "total": item_cost
                         })
-                        logger.debug(f"Added {product['name']}: ${product['price']}")
+                        logger.info(
+                            f" Matched '{norm_item.original_text}'-> {product['name']} "
+                            f"{quantity} = ${item_cost:.2f}"
+                        )
+                        found = True
+                    else:
+                        logger.info(f"  {product['name']} is out of stock")
+                        not_found.append(f"{product['name']} (out of stock)")
+                        found = True
                     break
-        result = {
-            "total_cost": round(total_cost, 2),
-            "budget": budget,
-            "within_budget": total_cost <= budget,
-            "items": found_items,
-            "remaining": round(budget - total_cost, 2)
-        }
+            
+            if not found:
+                not_found.append(norm_item.original_text)
+                logger.info(f"   No match found for '{norm_item.original_text}'")
         
-        logger.info(f"Budget calculation: ${result['total_cost']} vs ${budget} - Within budget: {result['within_budget']}")
+        # Calculate results
+        within_budget = total_cost <= budget
+        remaining = budget - total_cost
         
-        if total_cost <= budget:
-            return f"Great! Your items total ${result['total_cost']}, which is within your ${budget} budget. You have ${result['remaining']} remaining."
+        logger.info(
+            f"Budget calculation: ${total_cost:.2f} vs ${budget:.2f} - "
+            f"Within budget: {within_budget}"
+        )
+        
+        # Build detailed response
+        response_parts = []
+        
+        # Found items breakdown
+        if found_items:
+            response_parts.append(" Items found:")
+            for item in found_items:
+                if item['quantity'] > 1:
+                    response_parts.append(
+                        f"  • {item['original']}-> {item['matched']} "
+                        f"x{item['quantity']} = ${item['total']:.2f} "
+                        f"(${item['price']:.2f} each)"
+                    )
+                else:
+                    response_parts.append(
+                        f"  • {item['original']}-> {item['matched']}: ${item['price']:.2f}"
+                    )
+        
+        # Not found items
+        if not_found:
+            response_parts.append("")
+            response_parts.append(" Not available:")
+            for item in not_found:
+                response_parts.append(f"  • {item}")
+        
+        # Budget summary
+        response_parts.append("")
+        response_parts.append("=" * 40)
+        if within_budget:
+            response_parts.append(
+                f"Total: ${total_cost:.2f} -  Within your ${budget:.2f} budget!"
+            )
+            response_parts.append(f"Remaining: ${remaining:.2f}")
         else:
-            return f"Your selected items total ${result['total_cost']}, which exceeds your ${budget} budget by ${round(total_cost - budget, 2)}. Consider removing some items."
+            overage = abs(remaining)
+            response_parts.append(
+                f"Total: ${total_cost:.2f} - Exceeds your ${budget:.2f} budget by ${overage:.2f}"
+            )
+        
+        return "\n".join(response_parts)
         
     except Exception as e:
         logger.error(f"Error calculating budget: {e}", exc_info=True)
         return f"Error calculating budget: {str(e)}"
 
-@tool
-def add_to_cart(item_name: str, quantity: int = 1) -> str:
-    """
-        Add an item to the shopping cart.
-    """
-    logger.info(f"Tool called: add_to_cart - '{item_name}' x{quantity}")
-    
-    try:
-        with open(DATA_DIR / "products.json", 'r') as f:
-            products = json.load(f)
-            
-        item_name_lower = item_name.lower()
-        for product in products:
-            if item_name_lower in product['name'].lower():
-        
-                if not product['in_stock']:
-                    return f"Sorry, {product['name']} is currently out of stock."
-                        
-                if product['id'] in CART:
-                    CART[product['id']]['quantity'] += quantity
-                    logger.warning(f"Cannot add {product['name']} - out of stock")
-                else:
-                    CART[product['id']] = {
-                        'name': product['name'],
-                        'price': product['price'],
-                        'quantity': quantity
-                    }
-                    logger.debug(f"Added new item {product['name']} to cart")
-                
-                total_items = sum(item['quantity'] for item in CART.values())
-                logger.info(f"Cart updated: {total_items} total items")
-                return f"Added {quantity} x {product['name']} to cart. Cart now has {total_items} items."
-        
-        logger.warning(f"Item '{item_name}' not found")
-        return f"Item '{item_name}' not found."
-        
-    except Exception as e:
-        logger.error(f"Error adding to cart: {e}", exc_info=True)
-        return f"Error adding to cart: {str(e)}"
-
-@tool
-def get_cart_summary() -> str:
-    """
-        Get a summary of items currently in
-    """
-    logger.info("Tool called: get_cart_summary")
-    
-    if not CART:
-        logger.debug("Cart is empty")
-        return "Your cart is empty."
-    
-    summary = "Your Cart:\n"
-    total = 0
-    
-    for item_id, item_data in CART.items():
-        item_total = item_data['price'] * item_data['quantity']
-        total += item_total
-        summary += f"- {item_data['name']}: {item_data['quantity']} x ${item_data['price']} = ${item_total}\n"
-    
-    summary += f"\nTotal: ${round(total, 2)}"
-    logger.info(f"Cart summary: {len(CART)} unique items, total ${round(total, 2)}")
-    return summary
     
 # All tools
 grocery_tools = [
-    get_item_price,
     create_refund,
-    calculate_budget,
-    add_to_cart,
-    get_cart_summary
+    calculate_budget
 ]

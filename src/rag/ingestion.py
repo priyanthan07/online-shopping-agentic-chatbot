@@ -21,7 +21,7 @@ class DataIngestion:
         
     def load_json_data(self, filename: str) -> List[Dict]:
         file_path = DATA_DIR / filename
-        logger.debug(f"Loading {filename}")
+        logger.info(f"Loading {filename}")
         with open(file_path, 'r') as f:
             data =  json.load(f)
         logger.info(f"Loaded {len(data)} items from {filename}")

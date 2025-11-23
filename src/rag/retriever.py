@@ -22,18 +22,18 @@ class RAGRetriever:
         """
             Retrieve relevant documents
         """
-        self.logger.debug(f"Retrieving documents for query: {query[:50]}...")
+        self.logger.info(f"Retrieving documents for query: {query[:50]}...")
         if filter_type:
-            self.logger.debug(f"Applying filter: type={filter_type}")
+            self.logger.info(f"Applying filter: type={filter_type}")
             retriever = self.vectorstore.as_retriever(
                 search_kwargs={
                     "k": 5,
                     "filter": {"type": filter_type}
                 }
             )
-            docs = retriever.get_relevant_documents(query)
+            docs = retriever.invoke(query)
         else:
-            docs = self.retriever.get_relevant_documents(query)
+            docs = self.retriever.invoke(query)
             
         self.logger.info(f"Retrieved {len(docs)} documents")
         
@@ -45,5 +45,5 @@ class RAGRetriever:
         """
         docs = self.retrieve(query, filter_type)
         context = "\n\n".join([doc.page_content for doc in docs])
-        self.logger.debug(f"Context length: {len(context)} characters")
+        self.logger.info(f"Context length: {len(context)} characters")
         return context

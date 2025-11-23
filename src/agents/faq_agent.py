@@ -4,9 +4,10 @@ from src.rag.retriever import RAGRetriever
 from src.config import MODEL_NAME, OPENAI_API_KEY
 from src.monitoring.logger import setup_logger
 from langfuse.langchain import CallbackHandler
+from typing import Optional
 
 class FAQAgent:
-    def __init__(self, langfuse_handler: CallbackHandler):
+    def __init__(self, langfuse_handler: Optional[CallbackHandler]):
         self.llm = ChatOpenAI(model=MODEL_NAME, temperature=0,api_key=OPENAI_API_KEY)
         self.retriever = RAGRetriever()
         self.langfuse_handler = langfuse_handler
@@ -31,11 +32,11 @@ class FAQAgent:
             Answer FAQ questions using RAG
         """
         self.logger.info(f"FAQAgent answering question")
-        self.logger.debug(f"Question: {question}")
+        self.logger.info(f"Question: {question}")
         
         try:
             context = self.retriever.get_context(question)
-            self.logger.debug(f"Retrieved context length: {len(context)} chars")
+            self.logger.info(f"Retrieved context length: {len(context)} chars")
             
             full_question = f"Context: {context}\n\nQuestion: {question}"
             
@@ -45,7 +46,7 @@ class FAQAgent:
             )
             response = result["messages"][-1].content
             self.logger.info("FAQAgent answered successfully")
-            self.logger.debug(f"Answer: {response[:100]}...")
+            self.logger.info(f"Answer: {response[:100]}...")
             
             return response
         
