@@ -1,0 +1,78 @@
+[
+    {
+        "order_id": "ORD001",
+        "total": 45.99,
+        "status": "delivered",
+        "items": [
+            "Organic Milk",
+            "Whole Wheat Bread"
+        ],
+        "customer_id": "CUST001",
+        "order_date": "2025-11-15",
+        "delivery_date": "2025-11-16"
+    },
+    {
+        "order_id": "ORD002",
+        "total": 89.50,
+        "status": "shipped",
+        "items": [
+            "Apples",
+            "Chicken Breast"
+        ],
+        "customer_id": "CUST002",
+        "order_date": "2025-11-20",
+        "delivery_date": "2025-11-21"
+    },
+    {
+        "order_id": "ORD003",
+        "total": 120.00,
+        "status": "processing",
+        "items": [
+            "Rice",
+            "Pasta",
+            "Bananas"
+        ],
+        "customer_id": "CUST003",
+        "order_date": "2025-11-22",
+        "delivery_date": null
+    },
+    {
+        "order_id": "ORD004",
+        "total": 25.47,
+        "status": "delivered",
+        "items": [
+            "Bananas",
+            "Apples"
+        ],
+        "customer_id": "CUST001",
+        "order_date": "2025-11-18",
+        "delivery_date": "2025-11-19"
+    },
+    {
+        "order_id": "ORD005",
+        "total": 999.99,
+        "status": "delivered",
+        "items": [
+            "Rice",
+            "Chicken Breast",
+            "Organic Milk",
+            "Free Range Eggs"
+        ],
+        "customer_id": "CUST004",
+        "order_date": "2025-11-10",
+        "delivery_date": "2025-11-11"
+    },
+    {
+        "order_id": "ORD006",
+        "total": 1500.00,
+        "status": "delivered",
+        "items": [
+            "Bulk order - Rice",
+            "Chicken Breast"
+        ],
+        "customer_id": "CUST005",
+        "order_date": "2025-11-05",
+        "delivery_date": "2025-11-06",
+        "note": "This order exceeds refund limit - requires manager approval"
+    }
+]

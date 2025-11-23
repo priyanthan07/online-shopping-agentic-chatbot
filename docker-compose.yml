@@ -1,48 +1,6 @@
 version: '3.8'
 
 services:
-  # Langfuse PostgreSQL Database
-  langfuse-db:
-    image: postgres:15-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: langfuse
-      POSTGRES_PASSWORD: langfuse
-      POSTGRES_DB: langfuse
-    volumes:
-      - langfuse-db-data:/var/lib/postgresql/data
-    networks:
-      - grocery-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U langfuse"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Langfuse Tracing Platform
-  langfuse:
-    image: langfuse/langfuse:latest
-    restart: unless-stopped
-    depends_on:
-      langfuse-db:
-        condition: service_healthy
-    ports:
-      - "3000:3000"
-    environment:
-      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
-      NEXTAUTH_SECRET: mysecret
-      SALT: mysalt
-      NEXTAUTH_URL: http://localhost:3000
-      TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-true}
-      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: ${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES:-false}
-    networks:
-      - grocery-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/public/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   # MCP Server for Stock Management
   mcp-server:
     build:
@@ -51,14 +9,10 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8001"
+    volumes:
+      - ./data:/app/data:ro
     networks:
       - grocery-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   # Streamlit Chatbot UI
   chatbot:
@@ -67,42 +21,30 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
-      langfuse:
-        condition: service_healthy
-      mcp-server:
-        condition: service_healthy
+      - mcp-server
     ports:
       - "8501:8501"
     environment:
-      # OpenAI Configuration
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
       MODEL_NAME: ${MODEL_NAME:-gpt-4o}
       
-      # Langfuse Configuration
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-public-key}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-secret-key}
-      LANGFUSE_BASE_URL: http://langfuse:3000
+      # Cloud Langfuse (from .env)
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL}
       
-      # MCP Server Configuration
-      MCP_SERVER_URL: http://mcp-server:8001
+      # Docker network
+      MCP_SERVER_URL: http://mcp-server:8001/mcp
       
-      # Application Configuration
-      CHROMA_PERSIST_DIR: /app/chroma_db
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
-      
-      # Guardrails Configuration
-      MAX_REFUND_AMOUNT: ${MAX_REFUND_AMOUNT:-1000.0}
     volumes:
-      # Persist data directories
-      - ./data:/app/data
+      - ./data:/app/data:ro
       - ./logs:/app/logs
       - chroma-data:/app/chroma_db
     networks:
       - grocery-net
+    command: sh -c "sleep 10 && streamlit run app.py --server.port=8501 --server.address=0.0.0.0"
 
 volumes:
-  langfuse-db-data:
-    driver: local
   chroma-data:
     driver: local
 

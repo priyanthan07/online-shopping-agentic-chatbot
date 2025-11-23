@@ -33,9 +33,8 @@ async def initialize_mcp():
 
 def initialize_system():
     """Initialize the chatbot system - REUSABLE by both CLI and Streamlit"""
-    logger.info("="*50)
+
     logger.info("Initializing Grocery Shopping Chatbot")
-    logger.info("="*50)
     
     # Initialize vector store
     logger.info("[1/4] Initializing Vector Store...")
@@ -55,17 +54,16 @@ def initialize_system():
             secret_key=LANGFUSE_SECRET_KEY,
             host=LANGFUSE_BASE_URL
         )
-        langfuse_handler = CallbackHandler(
-            public_key=LANGFUSE_PUBLIC_KEY,
-            secret_key=LANGFUSE_SECRET_KEY,
-            host=LANGFUSE_BASE_URL
-        )
-        # Test connection
-        langfuse_handler.auth_check()
+        
+        langfuse_handler = CallbackHandler()
+        langfuse_handler.langfuse = langfuse
+        
         logger.info(" Langfuse connected")
+        
     except Exception as e:
         logger.warning(f"Langfuse connection warning: {e}")
         logger.info("Continuing without Langfuse tracing...")
+        langfuse_handler = None
     
     # Initialize MCP
     logger.info("[3/4] Connecting to MCP Server...")
@@ -90,11 +88,11 @@ def process_user_query(orchestrator, user_input: str, session_id: str):
         Process user query - REUSABLE by both CLI and Streamlit
     """
     logger.info(f"Processing query for session: {session_id}")
-    logger.debug(f"User query: {user_input}")
+    logger.info(f"User query: {user_input}")
     
     try:
         result = orchestrator.process(user_input, session_id)
-        logger.debug(f"Agent: {result['agent']}, Blocked: {result.get('blocked', False)}")
+        logger.info(f"Agent: {result['agent']}, Blocked: {result.get('blocked', False)}")
         return result
     except Exception as e:
         logger.error(f"Error processing query: {e}", exc_info=True)

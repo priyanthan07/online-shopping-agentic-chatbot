@@ -30,4 +30,4 @@ MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "")
 
 # Guardrails Configuration
 MAX_REFUND_AMOUNT = 1000.0
-RESTRICTED_TOPICS = ["politics", "religion", "personal attacks"]
+RESTRICTED_TOPICS = ["politic", "religio", "personal attack"]

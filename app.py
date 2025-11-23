@@ -8,7 +8,7 @@ import uuid
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Import from main.py
-from src.main import initialize_system
+from src.main import initialize_system, process_user_query, run_evaluation
 from src.monitoring.logger import setup_logger
 
 # Setup logger
@@ -96,7 +96,7 @@ def main():
             st.success(" Chatbot system ready!")
         except Exception as e:
             st.error(f" Failed to initialize system: {str(e)}")
-            logger.error(f"Initialization error: {e}")
+            logger.error(f"Initialization error: {e}", exc_info=True)
             st.stop()
     
     # Initialize session state
@@ -105,6 +105,9 @@ def main():
     
     if "session_id" not in st.session_state:
         st.session_state.session_id = f"streamlit_{uuid.uuid4().hex[:8]}"
+    
+    if "show_evaluation" not in st.session_state:
+        st.session_state.show_evaluation = False
     
     # Sidebar
     with st.sidebar:
@@ -118,11 +121,20 @@ def main():
         st.text(f"Messages: {len(st.session_state.messages)}")
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Clear chat button
-        if st.button(" Clear Chat", use_container_width=True, type="primary"):
-            st.session_state.messages = []
-            st.session_state.session_id = f"streamlit_{uuid.uuid4().hex[:8]}"
-            st.rerun()
+        # Action buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button(" Clear Chat", use_container_width=True):
+                st.session_state.messages = []
+                st.session_state.session_id = f"streamlit_{uuid.uuid4().hex[:8]}"
+                logger.info("Chat cleared by user")
+                st.rerun()
+        
+        with col2:
+            if st.button(" Evaluate", use_container_width=True, type="primary"):
+                st.session_state.show_evaluation = True
+                logger.info("Evaluation triggered by user")
+                st.rerun()
         
         st.markdown("---")
         
@@ -142,21 +154,71 @@ def main():
         
         # Example queries
         st.subheader(" Try These Examples")
-        example_queries = [
-            "What's your return policy?",
-            "Add milk to my cart",
-            "What's the price of apples?",
-            "Can I buy milk and bread for $10?",
-            "Do you deliver on weekends?",
-            "Show me my cart",
-            "Check stock for P001",
-            "Create a refund for ORD001"
-        ]
+        example_categories = {
+            " FAQ Queries": [
+                "What's your return policy?",
+                "Do you deliver on weekends?",
+                "What payment methods do you accept?",
+            ],
+            " Shopping Actions": [
+                "How much does milk cost?",
+                "Can I buy milk and bread for $10?",
+                "Check stock for product P001",
+            ],
+            " Budget & Refunds": [
+                "Can I afford rice, chicken, and eggs within $30?",
+                "Create a refund for order ORD001",
+                "Create a refund for order ORD005",
+            ],
+            " Edge Cases & Testing": [
+                "Check stock for product P007",  # Out of stock
+                "Create a refund for ORD999",  # Invalid order
+                "I want a refund for order ORD006",  # Exceeds limit
+            ]
+        }
         
-        for query in example_queries:
-            if st.button(f" {query}", key=f"example_{hash(query)}", use_container_width=True):
-                st.session_state.example_query = query
-                st.rerun()
+        for category, queries in example_categories.items():
+            with st.expander(category):
+                for query in queries:
+                    if st.button(f" {query}", key=f"example_{hash(query)}", use_container_width=True):
+                        st.session_state.example_query = query
+                        st.rerun()
+    
+    # Show evaluation results if requested
+    if st.session_state.show_evaluation:
+        st.markdown("---")
+        st.subheader(" Evaluation Results")
+        
+        with st.spinner("Running evaluation tests..."):
+            # Use main.py's run_evaluation function
+            summary = run_evaluation(orchestrator)
+            
+            # Display metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Pass Rate", f"{summary['pass_rate']*100:.1f}%")
+            with col2:
+                st.metric("Tests Passed", f"{summary['passed']}/{summary['total_tests']}")
+            with col3:
+                st.metric("Avg Score", f"{summary['average_score']:.2f}")
+            with col4:
+                st.metric("Avg Latency", f"{summary['average_latency']:.2f}s")
+            
+            # Show individual results
+            with st.expander(" Detailed Test Results"):
+                for i, result in enumerate(summary['results'], 1):
+                    status_icon = "" if result['passed'] else ""
+                    st.markdown(f"**Test {i}:** {status_icon} {result['question']}")
+                    st.text(f"Score: {result['final_score']:.2f} | Agent: {result['agent_used']} | Latency: {result['latency']:.2f}s")
+                    st.text(f"Response: {result['response'][:100]}...")
+                    st.markdown("---")
+        
+        # Button to close evaluation
+        if st.button(" Close Evaluation"):
+            st.session_state.show_evaluation = False
+            st.rerun()
+        
+        st.markdown("---")
     
     # Display chat messages
     for message in st.session_state.messages:
@@ -168,7 +230,7 @@ def main():
                 agent = message["agent"]
                 agent_class = f"agent-{agent}"
                 st.markdown(
-                    f'<span class="agent-badge {agent_class}">🤖 Agent: {agent.upper()}</span>',
+                    f'<span class="agent-badge {agent_class}"> Agent: {agent.upper()}</span>',
                     unsafe_allow_html=True
                 )
     
@@ -181,6 +243,8 @@ def main():
     
     # Process user input
     if user_input:
+        logger.info(f"User input received: {user_input[:50]}...")
+        
         # Add user message to chat
         st.session_state.messages.append({
             "role": "user",
@@ -194,44 +258,37 @@ def main():
         # Get bot response
         with st.chat_message("assistant"):
             with st.spinner(" Thinking..."):
-                try:
-                    # Process through orchestrator (using main.py's initialization)
-                    result = orchestrator.process(user_input, st.session_state.session_id)
-                    
-                    # Extract response and metadata
-                    response = result.get("response", "I apologize, but I couldn't process your request.")
-                    agent = result.get("agent", "unknown")
-                    blocked = result.get("blocked", False)
-                    
-                    # Display response
-                    st.markdown(response)
-                    
-                    # Show agent badge
-                    agent_class = f"agent-{agent}"
-                    st.markdown(
-                        f'<span class="agent-badge {agent_class}">🤖 Agent: {agent.upper()}</span>',
-                        unsafe_allow_html=True
-                    )
-                    
-                    # Add to message history
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": response,
-                        "agent": agent,
-                        "blocked": blocked
-                    })
-                    
-                except Exception as e:
-                    error_msg = f" An error occurred: {str(e)}"
-                    st.error(error_msg)
-                    logger.error(f"Error processing message: {e}")
-                    
-                    # Add error to history
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": error_msg,
-                        "agent": "error"
-                    })
+                
+                result = process_user_query(
+                    orchestrator, 
+                    user_input, 
+                    st.session_state.session_id
+                )
+                
+                # Extract response and metadata
+                response = result.get("response", "I apologize, but I couldn't process your request.")
+                agent = result.get("agent", "unknown")
+                blocked = result.get("blocked", False)
+                
+                # Display response
+                st.markdown(response)
+                
+                # Show agent badge
+                agent_class = f"agent-{agent}"
+                st.markdown(
+                    f'<span class="agent-badge {agent_class}"> Agent: {agent.upper()}</span>',
+                    unsafe_allow_html=True
+                )
+                
+                # Add to message history
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": response,
+                    "agent": agent,
+                    "blocked": blocked
+                })
+                
+                logger.info(f"Response generated by {agent} agent")
 
 
 if __name__ == "__main__":
