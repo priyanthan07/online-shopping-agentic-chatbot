@@ -168,30 +168,60 @@ The application runs two Docker services:
 ## Project Structure
 
 ```
-.
-├── docker-compose.yml          # Docker orchestration
-├── Dockerfile                  # Chatbot service container
-├── Dockerfile.mcp             # MCP server container
-├── app.py                     # Streamlit web interface
-├── data/                      # All data files
-│   ├── faqs.json             # FAQ content
-│   ├── products.json         # Product catalog
-│   ├── policies.json         # Store policies
-│   ├── orders.json           # Order data
-│   ├── stock.json            # Inventory data
-│   └── evaluation_tests.json # Test cases
-├── src/                       # Source code
-│   ├── agents/               # Agent implementations
-│   ├── rag/                  # RAG components
-│   ├── tools/                # Tool implementations
-│   ├── guardrails/           # Safety mechanisms
-│   ├── monitoring/           # Logging and evaluation
-│   ├── config.py             # Configuration
-│   └── main.py               # Core initialization
-├── mcp_server/                # MCP server
-│   └── server.py             # FastMCP server
-├── logs/                      # Application logs
-└── chroma_db/                 # Vector database (persisted)
+📦online-shopping-agentic-chatbot
+ ┣ 📂.git
+ ┃ ┣ 📜.gitignore
+ ┃ ┣ 📜.lock
+ ┃ ┣ 📜CACHEDIR.TAG
+ ┃ ┗ 📜pyvenv.cfg
+ ┣ 📂chroma_db
+ ┣ 📂data
+ ┃ ┣ 📜eval_qa_pairs.json
+ ┃ ┣ 📜faqs.json
+ ┃ ┣ 📜orders.json
+ ┃ ┣ 📜policies.json
+ ┃ ┣ 📜products.json
+ ┃ ┗ 📜stock.json
+ ┣ 📂logs
+ ┣ 📂mcp_server
+ ┃ ┣ 📜server.py
+ ┃ ┗ 📜__init__.py
+ ┣ 📂src
+ ┃ ┣ 📂agents
+ ┃ ┃ ┣ 📜action_agent.py
+ ┃ ┃ ┣ 📜faq_agent.py
+ ┃ ┃ ┣ 📜orchestrator.py
+ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┣ 📂guardrails
+ ┃ ┃ ┣ 📜safety.py
+ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┣ 📂monitoring
+ ┃ ┃ ┣ 📜evaluator.py
+ ┃ ┃ ┣ 📜logger.py
+ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┣ 📂rag
+ ┃ ┃ ┣ 📜ingestion.py
+ ┃ ┃ ┣ 📜retriever.py
+ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┣ 📂tools
+ ┃ ┃ ┣ 📜grocery_tools.py
+ ┃ ┃ ┣ 📜mcp_tool.py
+ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┣ 📜config.py
+ ┃ ┗ 📜main.py
+ ┣ 📜.dockerignore
+ ┣ 📜.env
+ ┣ 📜.env.example
+ ┣ 📜.gitignore
+ ┣ 📜.python-version
+ ┣ 📜app.py
+ ┣ 📜docker-compose.yml
+ ┣ 📜Dockerfile
+ ┣ 📜Dockerfile.mcp
+ ┣ 📜LICENSE
+ ┣ 📜pyproject.toml
+ ┣ 📜README.md
+ ┗ 📜uv.lock
 ```
 
 ## Configuration
