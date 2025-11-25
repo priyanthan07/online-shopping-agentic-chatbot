@@ -32,7 +32,7 @@ async def initialize_mcp():
 
 
 def initialize_system():
-    """Initialize the chatbot system - REUSABLE by both CLI and Streamlit"""
+    """Initialize the chatbot system"""
 
     logger.info("Initializing Grocery Shopping Chatbot")
     
